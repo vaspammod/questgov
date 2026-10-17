@@ -76,7 +76,7 @@ tailwind.config = {
       </div>
     </div>
     <div class="flex items-center gap-2 sm:gap-3">
-      <button onclick="clearInterval(window._t);S=null;openAdmin()" class="flex items-center gap-1.5 bg-sand-200 hover:bg-sand-300 text-sea-700 px-3 py-1.5 rounded-full text-xs font-medium transition">⚙️ <span class="hidden sm:inline">หลังบ้าน</span></button>
+      <button id="admBtn" style="display:none" onclick="clearInterval(window._t);S=null;openAdmin()" class="flex items-center gap-1.5 bg-sand-200 hover:bg-sand-300 text-sea-700 px-3 py-1.5 rounded-full text-xs font-medium transition">⚙️ <span class="hidden sm:inline">หลังบ้าน</span></button>
       <div class="hidden sm:flex items-center gap-1.5 bg-apricot-100 text-apricot-700 px-3 py-1.5 rounded-full text-xs font-medium">
         <span>🔥</span><span id="hdrStreak">0</span> วันติด
       </div>
@@ -956,10 +956,16 @@ document.addEventListener('keydown',e=>{
    9) ระบบหลังบ้าน (Admin) — ตำแหน่ง · ข้อสอบ · Google Sheet · นำเข้า/ส่งออก · สำรองข้อมูล
    ══════════════════════════════════════════════════════════════ */
 const LS_DB='leq_db', LS_BK='leq_bk', LS_SH='leq_sheet';
+const EMBED={sheet:'',app:'',auto:false,pin:''}; // EMBED_LINE
+let NOSAVE=false;
+const hp=s=>{let h=5381;for(const c of 'leq'+s)h=((h<<5)+h+c.charCodeAt(0))|0;return String(h);};
+const pinHash=()=>localStorage.getItem('leq_pin')||EMBED.pin||'';
+const cfgEff=()=>(EMBED.app||EMBED.sheet)?EMBED:shCfg();
+const showAdm=()=>{ ge('admBtn').style.display=location.hash==='#admin'?'':'none'; };
 const DEFAULT_DB = JSON.stringify({SECTIONS,PACKS});
 const ge=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const slug=s=>String(s).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'x'+Math.random().toString(36).slice(2,6);
+const slug=s=>String(s).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'x'+Math.abs(+hp(s)).toString(36);
 const uniq=(s,o)=>{let k=s,i=2;while(o[k])k=s+'-'+i++;return k;};
 const LET=['ก','ข','ค','ง'], GRADS=['from-sea-400 to-lilac-300','from-sea-500 to-mint-300','from-apricot-300 to-coral-300','from-lilac-300 to-sea-300','from-mint-500 to-sea-300'], COLORS=['sea','mint','coral','apricot','lilac'];
 const CARD='bg-white rounded-3xl p-5 shadow-soft border border-sand-300/60', INP='w-full border border-sand-300 rounded-xl px-3 py-2 text-sm bg-sand-50 focus:outline-none focus:border-sea-400',
@@ -969,7 +975,7 @@ let AT='pos', AF={pack:'',sec:'',q:''};
 
 function syncSecs(){ Object.entries(PACKS).forEach(([k,p])=>{ p.secs=(p.secs||[]).filter(s=>SECTIONS[s]&&SECTIONS[s].pack===k); Object.entries(SECTIONS).forEach(([s,v])=>{ if(v.pack===k&&!p.secs.includes(s)) p.secs.push(s); }); }); }
 function applyDB(d){ [[SECTIONS,d.SECTIONS],[PACKS,d.PACKS]].forEach(([t,s])=>{ Object.keys(t).forEach(k=>delete t[k]); Object.assign(t,JSON.parse(JSON.stringify(s))); }); syncSecs(); }
-function saveDB(){ try{ localStorage.setItem(LS_DB,JSON.stringify({SECTIONS,PACKS})); }catch(e){ toast('พื้นที่จัดเก็บเต็ม บันทึกไม่ได้','coral'); } renderDashboard(); }
+function saveDB(){ if(!NOSAVE) try{ localStorage.setItem(LS_DB,JSON.stringify({SECTIONS,PACKS})); }catch(e){ toast('พื้นที่จัดเก็บเต็ม บันทึกไม่ได้','coral'); } renderDashboard(); }
 const bks=()=>{ try{return JSON.parse(localStorage.getItem(LS_BK)||'[]');}catch(e){return [];} };
 function snap(label){ try{ const l=bks(); l.unshift({t:Date.now(),label,db:{SECTIONS,PACKS}}); localStorage.setItem(LS_BK,JSON.stringify(l.slice(0,10))); }catch(e){} }
 function dl(n,t,m='application/json'){ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([t],{type:m+';charset=utf-8'})); a.download=n; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),999); }
@@ -978,7 +984,9 @@ const confirmBox=(t,b,cb)=>openModal('⚠️',t,b,()=>{ closeModal(); cb(); });
 
 /* ---- shell ---- */
 const TABS=[['pos','🏛️ ตำแหน่ง/หมวดวิชา'],['q','📝 ข้อสอบ'],['gs','📊 Google Sheet'],['io','📥 นำเข้า/ส่งออก'],['bk','💾 สำรองข้อมูล']];
-function openAdmin(){ const l=bks(); if(!l.length||Date.now()-l[0].t>864e5) snap('สำรองอัตโนมัติรายวัน'); show('viewAdmin'); adminTab(AT); }
+function openAdmin(){
+  if(pinHash()&&sessionStorage.getItem('leq_ok')!=='1'){ const v=prompt('ใส่รหัส PIN เข้าหลังบ้าน'); if(v===null) return; if(hp(v.trim())!==pinHash()) return toast('รหัสไม่ถูกต้อง','coral'); sessionStorage.setItem('leq_ok','1'); }
+  const l=bks(); if(!l.length||Date.now()-l[0].t>864e5) snap('สำรองอัตโนมัติรายวัน'); show('viewAdmin'); adminTab(AT); }
 function adminTab(t){ AT=t; ge('adminForm').classList.add('hidden');
   ge('adminTabs').innerHTML=TABS.map(([k,n])=>`<button onclick="adminTab('${k}')" class="px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition ${k===t?'bg-sea-500 text-white shadow-soft':'text-sea-600/70 hover:bg-sand-100'}">${n}</button>`).join('');
   ({pos:tabPos,q:tabQ,gs:tabGs,io:tabIo,bk:tabBk})[t](); }
@@ -1046,7 +1054,7 @@ function legacy(t){ const h=(t[0]||[]).map(x=>String(x).trim()); if(h.indexOf('p
 function importTable(t,replace){
   t=legacy(t); const h=(t[0]||[]).map(x=>String(x).trim()), ix=n=>h.indexOf(n);
   if(ix('question')<0) throw new Error('ไม่พบคอลัมน์ question ในหัวตาราง');
-  snap('ก่อนนำเข้าข้อมูล');
+  if(!NOSAVE) snap('ก่อนนำเข้าข้อมูล');
   const oP=JSON.parse(JSON.stringify(PACKS)), oS=JSON.parse(JSON.stringify(SECTIONS));
   if(replace) [SECTIONS,PACKS].forEach(o=>Object.keys(o).forEach(k=>delete o[k]));
   let add=0,skip=0;
@@ -1073,29 +1081,40 @@ function doPost(e){const v=JSON.parse(e.postData.contents),ss=SpreadsheetApp.get
   const s=ss.getSheetByName(SH)||ss.insertSheet(SH);s.clear();
   s.getRange(1,1,v.length,v[0].length).setValues(v);return ContentService.createTextOutput('ok');}`;
 const shCfg=()=>{ try{return JSON.parse(localStorage.getItem(LS_SH)||'{}');}catch(e){return {};} };
-function gsSave(quiet){ const c={sheet:ge('gsUrl').value.trim(),app:ge('gsApp').value.trim()}; localStorage.setItem(LS_SH,JSON.stringify(c)); if(!quiet) toast('บันทึกการเชื่อมต่อแล้ว ✅','mint'); return c; }
+function gsSave(quiet){ const c={sheet:ge('gsUrl').value.trim(),app:ge('gsApp').value.trim(),auto:ge('gsAuto').checked}; localStorage.setItem(LS_SH,JSON.stringify(c)); if(!quiet) toast('บันทึกการเชื่อมต่อแล้ว ✅','mint'); return c; }
 function tabGs(){ const c=shCfg();
   ge('adminBody').innerHTML=`<div class="${CARD} mb-4"><p class="font-semibold mb-1">📊 เชื่อมต่อ Google Sheet</p>
     <p class="text-[11px] text-sea-600/70 mb-4">ชีตชื่อ <b>Questions</b> หัวตาราง: ${COLS.join(' , ')} (answer = 1–4 หรือ ก–ง)</p>
     <label class="text-[11px] text-sea-600/80 block">① ลิงก์ Google Sheet (แชร์แบบ “ทุกคนที่มีลิงก์ดูได้”) — ดึงข้อมูลอย่างเดียว<input id="gsUrl" value="${esc(c.sheet)}" placeholder="https://docs.google.com/spreadsheets/d/..." class="${INP} mt-1"></label>
     <label class="text-[11px] text-sea-600/80 block mt-3">② ลิงก์ Apps Script Web App — ดึงและส่งข้อมูลขึ้นชีตได้<input id="gsApp" value="${esc(c.app)}" placeholder="https://script.google.com/macros/s/.../exec" class="${INP} mt-1"></label>
+    <label class="flex items-center gap-2 text-xs text-sea-700 mt-3"><input type="checkbox" id="gsAuto" ${c.auto?'checked':''}> โหลดข้อสอบจากชีตอัตโนมัติเมื่อผู้เรียนเปิดเว็บ (ต้องดาวน์โหลดไฟล์ฝังค่าด้านล่างไปอัปขึ้นเว็บด้วย)</label>
     <div class="flex flex-wrap gap-2 mt-4"><button onclick="gsSave()" class="${B2}">💾 บันทึกลิงก์</button><button onclick="gsPull(false)" class="${B1}">⬇️ ดึงข้อมูล (รวมกับที่มี)</button><button onclick="gsPull(true)" class="${B2}">⬇️ ดึงแทนที่ทั้งหมด</button><button onclick="gsPush()" class="${B1}">⬆️ ส่งขึ้นชีต</button></div>
     <p id="gsMsg" class="text-xs mt-3 text-sea-600/80"></p></div>
+  <div class="${CARD} mb-4"><p class="font-semibold mb-1">🔐 ความปลอดภัยและเผยแพร่</p>
+    <p class="text-[11px] text-sea-600/70 mb-3">ปุ่มหลังบ้านถูกซ่อน — เปิดด้วยการเติม <b>#admin</b> ท้ายลิงก์เว็บ PIN ช่วยกันคนทั่วไปเท่านั้น (ข้อมูลทั้งหมดอยู่ฝั่งเบราว์เซอร์) สถานะ PIN: ${pinHash()?'ตั้งไว้แล้ว':'ยังไม่ตั้ง'}</p>
+    <div class="flex flex-wrap gap-2 items-center"><input id="pinIn" type="password" placeholder="PIN ใหม่ (เว้นว่าง = ยกเลิก PIN)" class="${INP} !w-60"><button onclick="setPin()" class="${B2}">บันทึก PIN</button><button onclick="exportEmbed()" class="${B1}">⬇️ ดาวน์โหลดไฟล์ฝังค่าแล้ว (index.html)</button></div></div>
   <div class="${CARD}"><p class="font-semibold text-sm mb-2">ตั้งค่า Apps Script (ทำครั้งเดียว)</p>
     <ol class="text-xs text-sea-700/80 list-decimal pl-5 space-y-1 mb-3"><li>เปิดชีต → ส่วนขยาย → Apps Script แล้ววางโค้ดด้านล่าง</li><li>ทำให้ใช้งานได้ → เว็บแอป → ผู้มีสิทธิ์เข้าถึง: ทุกคน</li><li>คัดลอก URL ที่ได้ไปใส่ช่อง ②</li></ol>
     <textarea readonly id="gsCode" rows="7" class="${INP} font-mono text-[11px]">${esc(GS_CODE)}</textarea>
     <button onclick="navigator.clipboard.writeText(ge('gsCode').value);toast('คัดลอกโค้ดแล้ว','mint')" class="${B2} mt-2">📋 คัดลอกโค้ด</button></div>`; }
 async function gsPull(rep){ const c=gsSave(true), m=ge('gsMsg'); m.textContent='⏳ กำลังดึงข้อมูล...';
-  try{ let t;
-    if(c.app) t=await (await fetch(c.app)).json();
-    else if(c.sheet){ const id=(c.sheet.match(/\/d\/([\w-]+)/)||[])[1]; t=parseCSV(await (await fetch(id?`https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&sheet=Questions`:c.sheet)).text()); }
-    else throw new Error('ยังไม่ได้ใส่ลิงก์');
+  try{ if(!c.app&&!c.sheet) throw new Error('ยังไม่ได้ใส่ลิงก์'); const t=await fetchTable(c);
     const r=importTable(t,rep); m.textContent=`✅ เพิ่ม ${r.add} ข้อ · ข้าม ${r.skip} ข้อ (ซ้ำ/ไม่สมบูรณ์)`;
   }catch(e){ m.textContent='❌ ดึงข้อมูลไม่สำเร็จ: '+e.message+' — ตรวจสอบลิงก์และสิทธิ์การแชร์'; } }
 async function gsPush(){ const c=gsSave(true), m=ge('gsMsg'); if(!c.app) return toast('ต้องใส่ลิงก์ Apps Script ก่อน','coral');
   m.textContent='⏳ กำลังส่งข้อมูล...'; const t=toTable();
   try{ const r=await fetch(c.app,{method:'POST',body:JSON.stringify(t)}); m.textContent='✅ ส่ง '+(t.length-1)+' ข้อขึ้นชีตแล้ว ('+(await r.text()).slice(0,30)+')'; }
   catch(e){ m.textContent='❌ ส่งไม่สำเร็จ: '+e.message; } }
+
+async function fetchTable(c){ if(c.app) return await (await fetch(c.app)).json(); const id=(c.sheet.match(/\/d\/([\w-]+)/)||[])[1]; return parseCSV(await (await fetch(id?`https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&sheet=Questions`:c.sheet)).text()); }
+function setPin(){ const v=ge('pinIn').value.trim(); if(v) localStorage.setItem('leq_pin',hp(v)); else localStorage.removeItem('leq_pin'); toast(v?'ตั้ง PIN แล้ว ✅':'ยกเลิก PIN ในเบราว์เซอร์นี้แล้ว','mint'); tabGs(); }
+async function exportEmbed(){ const c=gsSave(true), line='const EMBED='+JSON.stringify({sheet:c.sheet,app:c.app,auto:!!c.auto,pin:localStorage.getItem('leq_pin')||EMBED.pin||''})+';', re=/const EMBED=\{[^\n]*?\};(?= \/\/ EMBED_LINE)/;
+  try{ const h=await (await fetch(location.href.split('#')[0])).text(); if(!re.test(h)) throw 0; dl('index.html',h.replace(re,()=>line),'text/html'); toast('ดาวน์โหลดไฟล์แล้ว ✅ นำไปอัปขึ้นเว็บแทนไฟล์เดิม','mint'); }
+  catch(e){ try{ navigator.clipboard.writeText(line); }catch(_){} toast('เปิดจากไฟล์ในเครื่องจึงโหลดต้นฉบับไม่ได้ — คัดลอกบรรทัดตั้งค่าแล้ว ให้ไปวางแทนบรรทัด const EMBED ในไฟล์','apricot'); } }
+async function autoLoad(){ const c=cfgEff(); if(!c.auto||(!c.app&&!c.sheet)||location.hash==='#admin') return;
+  const ap=t=>{ NOSAVE=true; try{ importTable(t,true); }catch(e){} NOSAVE=false; };
+  try{ const k=localStorage.getItem('leq_cache'); if(k&&!S) ap(JSON.parse(k)); }catch(e){}
+  try{ const t=await fetchTable(c); if(t.length>1){ localStorage.setItem('leq_cache',JSON.stringify(t)); if(!S) ap(t); } }catch(e){} }
 
 /* ---- TAB: นำเข้า / ส่งออก ---- */
 function tabIo(){
@@ -1117,6 +1136,7 @@ function resetDB(){ confirmBox('คืนค่าเริ่มต้น','ข
 /* INIT */
 try{ const r=localStorage.getItem(LS_DB); if(r) applyDB(JSON.parse(r)); }catch(e){}
 loadP(); paintProfile(); setMode('exam'); renderDashboard(); show('viewDashboard');
+showAdm(); addEventListener('hashchange',showAdm); autoLoad();
 </script>
 </body>
 </html>
