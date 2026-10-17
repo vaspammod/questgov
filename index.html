@@ -563,7 +563,7 @@ function renderDashboard(){
   document.getElementById('packGrid').innerHTML = Object.entries(PACKS).map(([k,p])=>{
     const n = p.secs.reduce((s,x)=>s+SECTIONS[x].q.length,0);
     return `<div onclick="startExam('${k}')" class="card-hover cursor-pointer bg-white rounded-3xl overflow-hidden shadow-soft hover:shadow-lift border border-sand-300/60 animate-floatUp">
-      <div class="h-24 bg-gradient-to-br ${p.grad} relative">
+      <div class="h-24 ${gCls(p.grad)} relative" ${gSty(p.grad)}>
         <div class="absolute -bottom-6 left-6 w-14 h-14 rounded-2xl bg-white shadow-soft grid place-items-center text-2xl">${p.icon}</div>
         <span class="absolute top-3 right-4 text-[10px] bg-white/30 text-white px-2.5 py-1 rounded-full">${p.sub}</span>
       </div>
@@ -982,6 +982,17 @@ function dl(n,t,m='application/json'){ const a=document.createElement('a'); a.hr
 const stamp=()=>new Date().toISOString().slice(0,16).replace(/[:T]/g,'-');
 const confirmBox=(t,b,cb)=>openModal('⚠️',t,b,()=>{ closeModal(); cb(); });
 
+/* ---- เลือกสีการ์ด 50 เฉดสี / เลือกไอคอน ---- */
+const hsl=(h,s,l)=>{ s/=100;l/=100; const k=n=>(n+h/30)%12,a=s*Math.min(l,1-l),f=n=>l-a*Math.max(-1,Math.min(k(n)-3,Math.min(9-k(n),1))); return '#'+[f(0),f(8),f(4)].map(x=>Math.round(x*255).toString(16).padStart(2,'0')).join(''); };
+const PALETTE=Array.from({length:50},(_,i)=>{ const h=i*7.2; return hsl(h,68,58)+','+hsl((h+28)%360,72,70); });
+const okG=g=>/^#[0-9a-f]{6},#[0-9a-f]{6}$/i.test(g||'');
+const gCls=g=>okG(g)?'':'bg-gradient-to-br '+g;
+const gSty=g=>okG(g)?`style="background:linear-gradient(135deg,${g.split(',')[0]},${g.split(',')[1]})"`:'';
+const ICONS='📋 📚 📖 📝 ✏️ 🎓 🏛️ 🏫 🏢 🏗️ 🏘️ 🏥 🚒 🚓 ⚖️ 📜 📊 📈 💰 🧾 💼 🗂️ 📁 🧮 🖥️ 💻 🌐 🔌 📡 🛠️ 🔧 ⚙️ 🏠 📐 📏 🧱 🚧 🛣️ 🌳 🌱 🌊 💧 ♻️ 🗑️ ⚡ 💡 🔬 🧪 🩺 💊 🧑‍⚕️ 👩‍🏫 🧑‍💼 👮 🧑‍🚒 🧑‍🌾 🧑‍🔧 🧑‍💻 📢 🎨 🖼️ 🎬 📷 🎯 🧠 🗣️ 🌏 🗺️ 🧭 🔒 🛡️ 🤝 ❤️ ⭐ 🏆 🎖️ 🔥 🚀 ✅ 📌 🧩 🔤 🔢 ➗ 🇹🇭'.split(' ');
+const iconPick=x=>`<input id="f_${x.id}" value="${esc(x.v)}" class="${INP} mt-1 !w-24 text-center text-lg"><div class="flex flex-wrap gap-1 mt-2 max-h-36 overflow-y-auto p-1.5 bg-sand-50 rounded-xl border border-sand-300">${ICONS.map(e=>`<button type="button" onclick="ge('f_${x.id}').value='${e}'" class="w-9 h-9 rounded-lg hover:bg-sea-100 text-lg ${x.v===e?'bg-sea-100 ring-1 ring-sea-400':''}">${e}</button>`).join('')}</div>`;
+const gradPick=x=>`<input type="hidden" id="f_${x.id}" value="${esc(x.v)}"><div class="grid grid-cols-10 gap-1.5 mt-2">${PALETTE.map(g=>`<button type="button" title="${g}" onclick="pickG('${x.id}','${g}',this)" class="h-8 rounded-lg ${x.v===g?'ring-2 ring-sea-600 ring-offset-1':''}" style="background:linear-gradient(135deg,${g.split(',')[0]},${g.split(',')[1]})"></button>`).join('')}</div>`;
+function pickG(id,v,el){ ge('f_'+id).value=v; el.parentNode.querySelectorAll('button').forEach(b=>b.classList.remove('ring-2','ring-sea-600','ring-offset-1')); el.classList.add('ring-2','ring-sea-600','ring-offset-1'); }
+
 /* ---- shell ---- */
 const TABS=[['pos','🏛️ ตำแหน่ง/หมวดวิชา'],['q','📝 ข้อสอบ'],['gs','📊 Google Sheet'],['io','📥 นำเข้า/ส่งออก'],['bk','💾 สำรองข้อมูล']];
 function openAdmin(){
@@ -992,7 +1003,7 @@ function adminTab(t){ AT=t; ge('adminForm').classList.add('hidden');
   ({pos:tabPos,q:tabQ,gs:tabGs,io:tabIo,bk:tabBk})[t](); }
 function form(title,fields,onSave){
   const f=ge('adminForm');
-  f.innerHTML=`<div class="${CARD} animate-popIn"><p class="font-semibold mb-4">${title}</p><div class="grid sm:grid-cols-2 gap-3">${fields.map(x=>`<label class="text-[11px] text-sea-600/80 ${x.w?'sm:col-span-2':''}">${x.l}${x.type==='area'?`<textarea id="f_${x.id}" rows="3" class="${INP} mt-1">${esc(x.v)}</textarea>`:x.type==='sel'?`<select id="f_${x.id}" class="${INP} mt-1">${x.opts.map(([v,n])=>`<option value="${esc(v)}" ${String(v)===String(x.v)?'selected':''}>${esc(n)}</option>`).join('')}</select>`:`<input id="f_${x.id}" value="${esc(x.v)}" class="${INP} mt-1">`}</label>`).join('')}</div><div class="flex gap-2 mt-4"><button id="fSave" class="${B1}">💾 บันทึก</button><button onclick="ge('adminForm').classList.add('hidden')" class="${B2}">ยกเลิก</button></div></div>`;
+  f.innerHTML=`<div class="${CARD} animate-popIn"><p class="font-semibold mb-4">${title}</p><div class="grid sm:grid-cols-2 gap-3">${fields.map(x=>`<label class="text-[11px] text-sea-600/80 ${x.w?'sm:col-span-2':''}">${x.l}${x.type==='icon'?iconPick(x):x.type==='grad'?gradPick(x):x.type==='area'?`<textarea id="f_${x.id}" rows="3" class="${INP} mt-1">${esc(x.v)}</textarea>`:x.type==='sel'?`<select id="f_${x.id}" class="${INP} mt-1">${x.opts.map(([v,n])=>`<option value="${esc(v)}" ${String(v)===String(x.v)?'selected':''}>${esc(n)}</option>`).join('')}</select>`:`<input id="f_${x.id}" value="${esc(x.v)}" class="${INP} mt-1">`}</label>`).join('')}</div><div class="flex gap-2 mt-4"><button id="fSave" class="${B1}">💾 บันทึก</button><button onclick="ge('adminForm').classList.add('hidden')" class="${B2}">ยกเลิก</button></div></div>`;
   f.classList.remove('hidden');
   ge('fSave').onclick=()=>{ const g={}; fields.forEach(x=>g[x.id]=ge('f_'+x.id).value.trim()); if(onSave(g)!==false) f.classList.add('hidden'); };
   f.scrollIntoView({behavior:'smooth',block:'start'}); }
@@ -1000,18 +1011,18 @@ function form(title,fields,onSave){
 /* ---- TAB: ตำแหน่ง / หมวดวิชา ---- */
 function tabPos(){
   ge('adminBody').innerHTML=`<div class="flex justify-between items-center mb-4"><p class="text-sm font-medium">ตำแหน่งสอบทั้งหมด ${Object.keys(PACKS).length} ตำแหน่ง</p><button onclick="editPack()" class="${B1}">＋ เพิ่มตำแหน่ง</button></div>`+
-  Object.entries(PACKS).map(([k,p])=>`<div class="${CARD} mb-4"><div class="flex flex-wrap items-center gap-3 mb-3"><span class="w-11 h-11 rounded-xl bg-gradient-to-br ${p.grad} grid place-items-center text-xl">${p.icon}</span><div class="flex-1 min-w-[180px]"><p class="font-semibold text-sm">${esc(p.name)}</p><p class="text-[11px] text-sea-600/70">${esc(p.sub)} · ${p.mins} นาที · ผ่านเกณฑ์ ${p.pass||60}%</p></div><button onclick="editPack('${k}')" class="${B2}">✏️ แก้ไข</button><button onclick="delPack('${k}')" class="${B3}">🗑️ ลบ</button></div>
+  Object.entries(PACKS).map(([k,p])=>`<div class="${CARD} mb-4"><div class="flex flex-wrap items-center gap-3 mb-3"><span class="w-11 h-11 rounded-xl ${gCls(p.grad)} grid place-items-center text-xl" ${gSty(p.grad)}>${p.icon}</span><div class="flex-1 min-w-[180px]"><p class="font-semibold text-sm">${esc(p.name)}</p><p class="text-[11px] text-sea-600/70">${esc(p.sub)} · ${p.mins} นาที · ผ่านเกณฑ์ ${p.pass||60}%</p></div><button onclick="editPack('${k}')" class="${B2}">✏️ แก้ไข</button><button onclick="delPack('${k}')" class="${B3}">🗑️ ลบ</button></div>
     <div class="space-y-1.5">${p.secs.map(s=>{const v=SECTIONS[s];return `<div class="flex items-center gap-2 bg-sand-50 rounded-xl px-3 py-2 text-xs"><span>${v.icon}</span><span class="flex-1">${esc(v.name)} <span class="text-sea-600/60">· ${v.q.length} ข้อ · น้ำหนัก ${v.weight}</span></span><button onclick="editSec('${s}')" class="${B2}">✏️</button><button onclick="delSec('${s}')" class="${B3}">🗑️</button></div>`;}).join('')||'<p class="text-xs text-sea-600/60">ยังไม่มีหมวดวิชา</p>'}</div>
     <button onclick="editSec(null,'${k}')" class="${B2} mt-3">＋ เพิ่มหมวดวิชา</button></div>`).join(''); }
 function editPack(k){
-  const p=k?PACKS[k]:{name:'',sub:'ภาค ข ความรู้เฉพาะตำแหน่ง',icon:'📋',mins:120,pass:60,desc:'',grad:GRADS[0]};
-  form(k?'แก้ไขตำแหน่ง':'เพิ่มตำแหน่งใหม่',[{id:'name',l:'ชื่อตำแหน่ง',v:p.name,w:1},{id:'sub',l:'ประเภท/ภาค',v:p.sub},{id:'icon',l:'ไอคอน (อีโมจิ)',v:p.icon},{id:'mins',l:'เวลาสอบ (นาที)',v:p.mins},{id:'pass',l:'เกณฑ์ผ่าน (%)',v:p.pass||60},{id:'grad',l:'สีการ์ด',v:p.grad,type:'sel',opts:GRADS.map(g=>[g,g.replace(/from-|to-/g,'')])},{id:'desc',l:'ขอบเขตวิชา/คำอธิบาย',v:p.desc,type:'area',w:1}],g=>{
+  const p=k?PACKS[k]:{name:'',sub:'ภาค ข ความรู้เฉพาะตำแหน่ง',icon:'📋',mins:120,pass:60,desc:'',grad:PALETTE[(Object.keys(PACKS).length*7)%50]};
+  form(k?'แก้ไขตำแหน่ง':'เพิ่มตำแหน่งใหม่',[{id:'name',l:'ชื่อตำแหน่ง',v:p.name,w:1},{id:'sub',l:'ประเภท/ภาค',v:p.sub},{id:'icon',l:'ไอคอน (คลิกเลือก หรือพิมพ์เอง)',v:p.icon,type:'icon',w:1},{id:'mins',l:'เวลาสอบ (นาที)',v:p.mins},{id:'pass',l:'เกณฑ์ผ่าน (%)',v:p.pass||60},{id:'grad',l:'สีการ์ด (เลือกจาก 50 เฉดสี)',v:p.grad,type:'grad',w:1},{id:'desc',l:'ขอบเขตวิชา/คำอธิบาย',v:p.desc,type:'area',w:1}],g=>{
     if(!g.name) return toast('กรุณากรอกชื่อตำแหน่ง','coral'),false;
     PACKS[k||uniq(slug(g.name),PACKS)]=Object.assign(p,{name:g.name,sub:g.sub,icon:g.icon||'📋',mins:+g.mins||120,pass:+g.pass||60,grad:g.grad,desc:g.desc,total:100,secs:p.secs||[],rule:p.rule||'b'});
     saveDB(); tabPos(); toast('บันทึกตำแหน่งแล้ว ✅','mint'); }); }
 function editSec(k,pk){
   const s=k?SECTIONS[k]:{name:'',icon:'📚',color:'sea',weight:20,pack:pk,q:[]};
-  form(k?'แก้ไขหมวดวิชา':'เพิ่มหมวดวิชา',[{id:'name',l:'ชื่อหมวดวิชา',v:s.name,w:1},{id:'pack',l:'ตำแหน่ง',v:s.pack,type:'sel',opts:Object.entries(PACKS).map(([a,b])=>[a,b.name])},{id:'icon',l:'ไอคอน (อีโมจิ)',v:s.icon},{id:'color',l:'สีหมวด',v:s.color,type:'sel',opts:COLORS.map(c=>[c,c])},{id:'weight',l:'น้ำหนักคะแนน',v:s.weight}],g=>{
+  form(k?'แก้ไขหมวดวิชา':'เพิ่มหมวดวิชา',[{id:'name',l:'ชื่อหมวดวิชา',v:s.name,w:1},{id:'pack',l:'ตำแหน่ง',v:s.pack,type:'sel',opts:Object.entries(PACKS).map(([a,b])=>[a,b.name])},{id:'icon',l:'ไอคอน (คลิกเลือก หรือพิมพ์เอง)',v:s.icon,type:'icon',w:1},{id:'color',l:'สีหมวด',v:s.color,type:'sel',opts:COLORS.map(c=>[c,c])},{id:'weight',l:'น้ำหนักคะแนน',v:s.weight}],g=>{
     if(!g.name) return toast('กรุณากรอกชื่อหมวดวิชา','coral'),false;
     SECTIONS[k||uniq(slug(g.name),SECTIONS)]=Object.assign(s,{name:g.name,pack:g.pack,icon:g.icon||'📚',color:g.color,weight:+g.weight||20});
     syncSecs(); saveDB(); tabPos(); toast('บันทึกหมวดวิชาแล้ว ✅','mint'); }); }
@@ -1061,7 +1072,7 @@ function importTable(t,replace){
   t.slice(1).forEach(r=>{ const g=n=>ix(n)<0?'':String(r[ix(n)]??'').trim(); if(!g('question')) return;
     const o=['A','B','C','D'].map(g), a=ansIdx(g('answer')); if(o.some(x=>!x)||a<0){skip++;return;}
     const pk=slug(g('pack')||g('packName')||'imported'), sn=g('sectionName'), sk=g('section')?slug(g('section')):(Object.keys(SECTIONS).find(k=>SECTIONS[k].pack===pk&&SECTIONS[k].name===sn)||uniq(slug(sn||'general'),SECTIONS));
-    if(!PACKS[pk]) PACKS[pk]=oP[pk]?{...oP[pk],secs:[]}:{name:g('packName')||pk,sub:'ภาค ข ความรู้เฉพาะตำแหน่ง',icon:g('icon')||'📋',mins:120,pass:60,total:100,desc:'',grad:GRADS[Object.keys(PACKS).length%GRADS.length],secs:[],rule:'b'};
+    if(!PACKS[pk]) PACKS[pk]=oP[pk]?{...oP[pk],secs:[]}:{name:g('packName')||pk,sub:'ภาค ข ความรู้เฉพาะตำแหน่ง',icon:g('icon')||'📋',mins:120,pass:60,total:100,desc:'',grad:PALETTE[(Object.keys(PACKS).length*7)%50],secs:[],rule:'b'};
     if(!SECTIONS[sk]) SECTIONS[sk]=oS[sk]?{...oS[sk],q:[]}:{name:sn||sk,icon:'📚',color:COLORS[Object.keys(SECTIONS).length%COLORS.length],weight:+g('weight')||20,pack:pk,q:[]};
     const sc=SECTIONS[sk]; if(sc.q.some(x=>x.t===g('question'))){skip++;return;}
     sc.q.push({t:g('question'),o,a,e:g('explanation')}); add++; });
