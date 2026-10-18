@@ -152,6 +152,7 @@ tailwind.config = {
     </div>
   </div>
 
+  <div id="myStats" class="mb-6"></div>
   <div id="catTabs" class="flex gap-2 mb-5 overflow-x-auto"></div>
   <div id="packGrid" class="grid grid-cols-1 md:grid-cols-3 gap-6"></div>
 
@@ -175,6 +176,7 @@ tailwind.config = {
             <p class="font-semibold truncate" id="exTitle">—</p>
           </div>
           <div class="flex items-center gap-2 shrink-0">
+            <div class="flex gap-1"><button onclick="fs(-1)" class="w-8 h-8 rounded-lg bg-sand-200 text-sea-700 text-xs">A−</button><button onclick="fs(1)" class="w-8 h-8 rounded-lg bg-sand-200 text-sea-700 text-sm font-medium">A+</button></div>
             <div id="comboChip" class="hidden items-center gap-1 bg-apricot-100 text-apricot-700 px-3 py-1.5 rounded-full text-xs font-medium">🔥 คอมโบ <span id="comboVal">0</span></div>
             <div class="flex items-center gap-2 bg-sea-50 border border-sea-200 px-3.5 py-2 rounded-2xl">
               <span class="text-sea-500">⏳</span>
@@ -588,6 +590,7 @@ function renderDashboard(){
       <p class="text-[12px] font-medium leading-snug">${s.name}</p>
       <p class="text-[10px] text-sea-600/60 mt-1">${s.q.length} ข้อ · ${PACKS[s.pack].name.split(' ')[0]}</p>
     </div>`).join('');
+  paintStats();
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -595,21 +598,21 @@ function renderDashboard(){
    ══════════════════════════════════════════════════════════════ */
 const shuffle = a => a.map(v=>[Math.random(),v]).sort((x,y)=>x[0]-y[0]).map(v=>v[1]);
 
-function startExam(packKey, sectionKey){
+function startExam(packKey, sectionKey, list){
   const p = PACKS[packKey];
-  const secs = (sectionKey ? [sectionKey] : p.secs).filter(sk=>SECTIONS[sk]&&SECTIONS[sk].q.length);
+  const secs = list ? [...new Set(list.map(q=>q.sec))] : (sectionKey ? [sectionKey] : p.secs).filter(sk=>SECTIONS[sk]&&SECTIONS[sk].q.length);
   let qs = [];
-  secs.forEach(sk=> SECTIONS[sk].q.forEach((q,i)=> qs.push({...q, sec:sk, key:sk+'_'+i})));
+  if(list) qs=list; else secs.forEach(sk=> SECTIONS[sk].q.forEach((q,i)=> qs.push({...q, sec:sk, key:sk+'_'+i})));
   if(!qs.length) return toast('ยังไม่มีข้อสอบในชุดนี้ — เพิ่มได้ที่หลังบ้าน','apricot');
   const secsMap = {};
   secs.forEach(sk=>secsMap[sk]=true);
 
-  const mins = sectionKey ? Math.max(10, Math.round(qs.length*1.5)) : p.mins;
-  S = { pack:packKey, single:!!sectionKey, secs, qs, i:0, ans:{}, bm:{}, combo:0, maxCombo:0,
-        left:mins*60, total:mins*60, mode:MODE, revealed:{} };
+  const mins = (sectionKey||list) ? Math.max(10, Math.round(qs.length*1.5)) : p.mins;
+  S = { pack:packKey, single:!!(sectionKey||list), list:!!list, secs, qs, i:0, ans:{}, bm:{}, combo:0, maxCombo:0,
+        left:mins*60, total:mins*60, mode:list?'practice':MODE, revealed:{} };
 
-  document.getElementById('exTitle').textContent = sectionKey ? SECTIONS[sectionKey].name : p.name;
-  document.getElementById('exSubTitle').textContent = (sectionKey?'ซ้อมรายหมวด · ':p.sub+' · ') + (MODE==='practice'?'โหมดฝึก เฉลยทันที':'โหมดสอบจริง');
+  document.getElementById('exTitle').textContent = list ? '📕 สมุดข้อที่ผิด' : sectionKey ? SECTIONS[sectionKey].name : p.name;
+  document.getElementById('exSubTitle').textContent = (sectionKey?'ซ้อมรายหมวด · ':p.sub+' · ') + (S.mode==='practice'?'โหมดฝึก เฉลยทันที':'โหมดสอบจริง');
   show('viewExam');
   renderQ(); renderNav(); tick();
   clearInterval(window._t); window._t = setInterval(tick,1000);
@@ -622,6 +625,7 @@ function tick(){
   const el=document.getElementById('timerText');
   el.textContent = `${pad(h)}:${pad(m)}:${pad(s)}`;
   el.className = 'font-semibold tabular-nums tracking-wide ' + (S.left<=300 ? 'text-apricot-700' : 'text-sea-700');
+  if(S.mode==='exam'&&(S.left===600||S.left===300)) toast('⏰ เหลือเวลา '+(S.left/60)+' นาที','apricot');
   if(S.left<=0){ clearInterval(window._t); toast('⌛ หมดเวลา ระบบส่งข้อสอบให้อัตโนมัติ','apricot'); doSubmit(); return; }
   S.left--;
 }
@@ -655,8 +659,9 @@ function renderQ(){
     </div>
     ${shown?`<div class="mt-5 p-4 rounded-2xl bg-lilac-100/70 border border-lilac-300/50">
       <p class="text-[12px] font-medium text-lilac-500 mb-1.5">💡 เฉลยและคำอธิบาย</p>
-      <p class="text-[13px] leading-[1.95] text-sea-800 font-light">${q.e}</p></div>`:''}`;
-  paintBm(); paintProgress();
+      <p class="text-[13px] leading-[1.95] text-sea-800 font-light">${q.e}</p></div>`:''}
+    <div class="mt-5 text-right"><button onclick="reportQ(S.qs[S.i])" class="text-[11px] text-sea-600/60 hover:text-coral-700">🚩 แจ้งข้อสอบผิด</button></div>`;
+  paintBm(); paintProgress(); document.getElementById('qCard').style.zoom=FS; saveSess();
 }
 
 function pick(idx){
@@ -672,7 +677,6 @@ function pick(idx){
     paintCombo();
   }
   renderQ(); renderNav();
-  if(S.mode==='exam' && S.i < S.qs.length-1) setTimeout(()=>{ S.i++; renderQ(); renderNav(); },220);
 }
 
 function paintCombo(){
@@ -748,6 +752,10 @@ function doSubmit(){
   clearInterval(window._t);
   const R = grade();
   LAST = { R, snapshot:S };
+  const hk=S.single?S.secs[0]:''; R.prev=S.list?null:((P.hist||[]).find(h=>h.pack===S.pack&&h.sec===hk)||null);
+  if(!S.list){ P.hist=P.hist||[]; P.hist.unshift({t:Date.now(),pack:S.pack,sec:hk,sc:R.scaled,pass:!!R.res.pass,n:S.qs.length}); P.hist=P.hist.slice(0,30); }
+  P.wrong=P.wrong||{}; R.detail.forEach(d=>{ const k=d.q.sec+'|'+d.q.t; if(d.ok) delete P.wrong[k]; else if(d.picked!==undefined) P.wrong[k]={sec:d.q.sec,t:d.q.t}; });
+  try{ localStorage.removeItem('leq_sess'); }catch(e){}
   P.done += S.qs.length; P.correct += R.raw;
   if(S.mode==='exam') P.xp += R.raw*10 + (R.res.pass?50:10);
   award('first');
@@ -762,7 +770,7 @@ function doSubmit(){
   saveP(); paintProfile();
   renderResult(R);
   show('viewResult');
-  if(R.res.pass) confetti();
+  if(R.res.pass&&S.mode==='practice') confetti();
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -846,7 +854,7 @@ function renderResult(R){
       <h3 class="font-semibold mb-4">📊 การตัดสินผลตามหลักเกณฑ์</h3>
       ${ruleBox}
       <h3 class="font-semibold mb-4">🔍 วิเคราะห์รายหมวดวิชา</h3>
-      <div class="space-y-3">${rows}</div>
+      <div class="space-y-3">${rows}</div>${coach(R)}
     </div>
 
     <div class="flex flex-col sm:flex-row gap-3">
@@ -908,7 +916,7 @@ function renderReview(){
           <div class="p-4 rounded-2xl bg-sea-50 border border-sea-200/70">
             <p class="text-[12px] font-medium text-sea-700 mb-1.5">📌 บทวิเคราะห์และข้ออ้างอิง</p>
             <p class="text-[13px] leading-[2] text-sea-800 font-light">${q.e}</p>
-          </div></div>`;
+          </div><div class="text-right mt-2"><button onclick="reportQ(LAST.R.detail[${LAST.R.detail.indexOf(d)}].q)" class="text-[11px] text-sea-600/60 hover:text-coral-700">🚩 แจ้งข้อสอบผิด</button></div></div>`;
       }).join('')}
     </div>
     <div class="mt-6 flex gap-3">
@@ -923,7 +931,7 @@ function renderReview(){
    8) UI HELPERS
    ══════════════════════════════════════════════════════════════ */
 function show(id){ ['viewDashboard','viewExam','viewResult','viewReview','viewAdmin'].forEach(v=>document.getElementById(v).classList.toggle('hidden', v!==id)); window.scrollTo({top:0,behavior:'smooth'}); }
-function goHome(){ clearInterval(window._t); S=null; paintProfile(); show('viewDashboard'); }
+function goHome(){ clearInterval(window._t); S=null; try{ localStorage.removeItem('leq_sess'); }catch(e){} paintProfile(); show('viewDashboard'); }
 let mdCb=null;
 function openModal(i,t,b,cb){ document.getElementById('mdIcon').textContent=i; document.getElementById('mdTitle').textContent=t; document.getElementById('mdBody').textContent=b; mdCb=cb; document.getElementById('mdOk').onclick=cb; document.getElementById('modal').classList.remove('hidden'); }
 function closeModal(){ document.getElementById('modal').classList.add('hidden'); }
@@ -1006,6 +1014,35 @@ const SEED_ONLY={PACKS:{},SECTIONS:{}};
     SEED_ONLY.PACKS[pid]={name:pn,sub:'ภาค ข ความรู้เฉพาะตำแหน่ง',cat:'b',icon:ic,mins:120,pass:60,total:100,desc:secs.map(x=>x[0]).join(' · '),grad:PALETTE[(pi*3+5)%50],secs:keys,rule:'b'}; });
   Object.assign(PACKS,JSON.parse(JSON.stringify(SEED_ONLY.PACKS))); Object.assign(SECTIONS,JSON.parse(JSON.stringify(SEED_ONLY.SECTIONS))); })();
 const DEFAULT_DB = JSON.stringify({SECTIONS,PACKS});
+
+/* ---- ฟีเจอร์ผู้เรียน: สมุดข้อผิด · ประวัติ · ทำต่อ · ขนาดอักษร · แจ้งข้อผิด ---- */
+let FS=+(localStorage.getItem('leq_fs')||1);
+function applyFS(){ ge('qCard').style.zoom=FS; ge('viewReview').style.zoom=FS; }
+function fs(d){ FS=Math.min(1.4,Math.max(.9,Math.round((FS+d*.1)*10)/10)); try{ localStorage.setItem('leq_fs',FS); }catch(e){} applyFS(); }
+function wrongList(){ return Object.values(P.wrong||{}).map(w=>{ const sc=SECTIONS[w.sec]; if(!sc) return null; const i=sc.q.findIndex(q=>q.t===w.t); return i<0?null:{...sc.q[i],sec:w.sec,key:w.sec+'_'+i}; }).filter(Boolean); }
+function startWrong(){ const l=wrongList(); if(!l.length) return toast('ยังไม่มีข้อที่ตอบผิด 🎉','mint'); startExam(SECTIONS[l[0].sec].pack,null,shuffle(l)); }
+function paintStats(){ const w=wrongList().length, h=(P.hist||[]).slice(0,5);
+  ge('myStats').innerHTML=`<div class="grid md:grid-cols-2 gap-4"><div class="${CARD}"><p class="font-semibold text-sm mb-1">📕 สมุดข้อที่ตอบผิด</p><p class="text-[11px] text-sea-600/70 mb-3">ระบบเก็บข้อที่ตอบผิดไว้ให้ฝึกซ้ำ ตอบถูกเมื่อไหร่ข้อนั้นจะหายไปเอง</p><button onclick="startWrong()" class="${B1}">ฝึกซ้ำ ${w} ข้อ</button></div>
+  <div class="${CARD}"><p class="font-semibold text-sm mb-2">📈 ประวัติการสอบล่าสุด</p>${h.map(x=>`<p class="text-[11px] flex justify-between gap-2 py-1 border-b border-sand-200"><span class="truncate">${new Date(x.t).toLocaleDateString('th-TH')} · ${esc((x.sec?SECTIONS[x.sec]?.name:PACKS[x.pack]?.name)||'')}</span><b class="${x.pass?'text-mint-700':'text-coral-700'}">${x.sc}</b></p>`).join('')||'<p class="text-[11px] text-sea-600/60">ยังไม่มีประวัติ ลองทำข้อสอบสักชุดดู</p>'}
+  <div class="flex gap-2 mt-3"><button onclick="dl('leq-progress.json',JSON.stringify(P))" class="${B2}">⬇️ สำรองความคืบหน้า</button><label class="${B2}">⬆️ นำเข้า<input type="file" accept=".json" hidden onchange="importP(this)"></label></div></div></div>`; }
+function importP(inp){ const f=inp.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ try{ const d=JSON.parse(r.result); if(typeof d.xp!=='number') throw 0; P=Object.assign(P,d); saveP(); paintProfile(); paintStats(); toast('นำเข้าความคืบหน้าแล้ว ✅','mint'); }catch(e){ toast('ไฟล์ไม่ถูกต้อง','coral'); } }; r.readAsText(f); }
+function coach(R){ const e=Object.entries(R.bySec).map(([k,v])=>[k,v,Math.round(v.correct/v.total*100)]).sort((a,b)=>a[2]-b[2]), w=e[0]; let h='';
+  if(R.prev){ const d=Math.round((R.scaled-R.prev.sc)*100)/100; h+=`<p class="text-xs mt-4 p-3 rounded-xl bg-sea-50">เทียบกับครั้งก่อน: <b class="${d>=0?'text-mint-700':'text-coral-700'}">${d>=0?'+':''}${d} คะแนน</b> (ครั้งก่อน ${R.prev.sc})</p>`; }
+  if(w&&w[2]<80) h+=`<div class="mt-3 p-4 rounded-2xl bg-apricot-100/70 flex items-center gap-3 flex-wrap"><p class="text-xs flex-1 min-w-[180px]">📚 ควรเร่งวิชา <b>${w[1].name}</b> (${w[2]}%) ก่อน</p><button onclick="startExam('${LAST.snapshot.pack}','${w[0]}')" class="${B1}">ฝึกหมวดนี้</button></div>`;
+  return h; }
+function saveSess(){ if(!S) return; try{ localStorage.setItem('leq_sess',JSON.stringify({pack:S.pack,single:S.single,list:S.list,secs:S.secs,keys:S.qs.map(q=>q.key),i:S.i,ans:S.ans,bm:S.bm,mode:S.mode,total:S.total,end:Date.now()+S.left*1000})); }catch(e){} }
+function resumeSess(){ try{ const d=JSON.parse(localStorage.getItem('leq_sess')||'null'); if(!d) return; const left=Math.round((d.end-Date.now())/1000);
+  if(left<=0||!PACKS[d.pack]) return localStorage.removeItem('leq_sess');
+  openModal('⏱️','ทำข้อสอบต่อไหม','พบข้อสอบที่ทำค้างไว้ เหลือเวลาอีก '+Math.floor(left/60)+' นาที',()=>{ closeModal();
+    const qs=d.keys.map(k=>{ const j=k.lastIndexOf('_'), sk=k.slice(0,j), q=SECTIONS[sk]&&SECTIONS[sk].q[+k.slice(j+1)]; return q&&{...q,sec:sk,key:k}; });
+    if(qs.some(x=>!x)) return toast('ข้อสอบมีการเปลี่ยนแปลง ทำต่อไม่ได้','coral');
+    S={pack:d.pack,single:d.single,list:d.list,secs:d.secs,qs,i:d.i,ans:d.ans,bm:d.bm,combo:0,maxCombo:0,left,total:d.total,mode:d.mode,revealed:d.mode==='practice'?{...d.ans}:{}};
+    ge('exTitle').textContent=d.list?'📕 สมุดข้อที่ผิด':d.single?SECTIONS[d.secs[0]].name:PACKS[d.pack].name; ge('exSubTitle').textContent='ทำต่อจากที่ค้างไว้';
+    show('viewExam'); renderQ(); renderNav(); tick(); clearInterval(window._t); window._t=setInterval(tick,1000); }); }catch(e){} }
+function reportQ(q){ const note=prompt('ข้อนี้ผิดตรงไหน? (เช่น เฉลยไม่ตรง / กฎหมายแก้ไขแล้ว)'); if(!note) return;
+  const r={report:{time:new Date().toISOString(),section:SECTIONS[q.sec].name,question:q.t.slice(0,200),note}}, c=cfgEff();
+  if(c.app) fetch(c.app,{method:'POST',body:JSON.stringify(r)}).then(()=>toast('ส่งรายงานให้ผู้ดูแลแล้ว 🙏','mint')).catch(()=>toast('ส่งไม่สำเร็จ','coral'));
+  else { try{ const l=JSON.parse(localStorage.getItem('leq_reports')||'[]'); l.push(r.report); localStorage.setItem('leq_reports',JSON.stringify(l)); }catch(e){} toast('บันทึกรายงานไว้ในเครื่องแล้ว','sea'); } }
 
 /* ---- shell ---- */
 const TABS=[['pos','🏛️ ตำแหน่ง/หมวดวิชา'],['q','📝 ข้อสอบ'],['gs','📊 Google Sheet'],['io','📥 นำเข้า/ส่งออก'],['bk','💾 สำรองข้อมูล']];
@@ -1103,6 +1140,7 @@ const GS_CODE=`const SH='Questions';
 function doGet(){const s=SpreadsheetApp.getActive().getSheetByName(SH);
   return ContentService.createTextOutput(JSON.stringify(s?s.getDataRange().getValues():[])).setMimeType(ContentService.MimeType.JSON);}
 function doPost(e){const v=JSON.parse(e.postData.contents),ss=SpreadsheetApp.getActive();
+  if(v.report){const r=ss.getSheetByName('Reports')||ss.insertSheet('Reports');r.appendRow([v.report.time,v.report.section,v.report.question,v.report.note]);return ContentService.createTextOutput('ok');}
   const s=ss.getSheetByName(SH)||ss.insertSheet(SH);s.clear();
   s.getRange(1,1,v.length,v[0].length).setValues(v);return ContentService.createTextOutput('ok');}`;
 const shCfg=()=>{ try{return JSON.parse(localStorage.getItem(LS_SH)||'{}');}catch(e){return {};} };
@@ -1168,7 +1206,7 @@ try{ const r=localStorage.getItem(LS_DB);
     if(!localStorage.getItem('leq_seed1')){ Object.keys(SEED_ONLY.PACKS).forEach(k=>{ if(!PACKS[k]){ PACKS[k]=JSON.parse(JSON.stringify(SEED_ONLY.PACKS[k])); PACKS[k].secs.forEach(x=>{ SECTIONS[x]=JSON.parse(JSON.stringify(SEED_ONLY.SECTIONS[x])); }); } }); syncSecs(); saveDB(); } }
   localStorage.setItem('leq_seed1','1'); }catch(e){}
 loadP(); paintProfile(); setMode('exam'); renderDashboard(); show('viewDashboard');
-showAdm(); addEventListener('hashchange',showAdm); autoLoad();
+showAdm(); addEventListener('hashchange',showAdm); autoLoad(); applyFS(); resumeSess();
 </script>
 </body>
 </html>
